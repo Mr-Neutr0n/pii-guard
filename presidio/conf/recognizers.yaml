@@ -1,0 +1,117 @@
+global_regex_flags: 26
+
+recognizers:
+
+  # --- Built-in recognizers (enabled by default in upstream) ---
+
+  - name: CreditCardRecognizer
+    supported_languages:
+    - en
+    type: predefined
+
+  - name: EmailRecognizer
+    supported_languages:
+    - en
+    type: predefined
+
+  - name: IbanRecognizer
+    supported_languages:
+    - en
+    type: predefined
+
+  - name: IpRecognizer
+    supported_languages:
+    - en
+    type: predefined
+
+  - name: PhoneRecognizer
+    supported_languages:
+    - en
+    type: predefined
+
+  - name: UrlRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  - name: UsSsnRecognizer
+    supported_languages:
+    - en
+    type: predefined
+
+  - name: UsLicenseRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  - name: UsItinRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  - name: UsPassportRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  - name: UsBankRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  - name: MedicalLicenseRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  # --- Indian recognizers (disabled by default in upstream, enabled here) ---
+
+  - name: InPanRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: true
+
+  - name: InAadhaarRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: true
+
+  - name: InPassportRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: true
+
+  - name: InVehicleRegistrationRecognizer
+    supported_languages:
+    - en
+    type: predefined
+    enabled: false
+
+  # --- Custom recognizers ---
+
+  - name: UpiIdRecognizer
+    type: custom
+    supported_entity: IN_UPI_ID
+    supported_languages:
+    - en
+    patterns:
+    - name: upi_id
+      regex: '\b[a-zA-Z0-9._-]+@(?:ybl|okhdfcbank|okicici|okaxis|oksbi|apl|ibl|sbi|axisb|icici|hdfc|paytm|upi|gpay|phonepe|freecharge|airtel|jio|kotak|barodampay|dbs|federal|indus|rbl|yesbank|citi|hsbc|sc|idbi|pnb|bob|canara|unionbank|allahabad|indian|ubi|boi|central|dena|syndicate|obc|andhra|vijaya|corp|mahabank)\b'
+      score: 0.85
+    context:
+    - upi
+    - payment
+    - pay
+    - gpay
+    - phonepe
+    - paytm
+    - vpa

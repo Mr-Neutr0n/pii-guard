@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-row">
+        <h1>PII Guard</h1>
+        <span class="status-dot" id="statusDot"></span>
+      </div>
+      <p class="status-text" id="statusText">Checking...</p>
+    </header>
+
+    <div class="toggle-row">
+      <span>Protection</span>
+      <label class="switch">
+        <input type="checkbox" id="enableToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-value" id="totalCount">0</span>
+        <span class="stat-label">PII items redacted</span>
+      </div>
+    </div>
+
+    <div class="log-section">
+      <div class="log-header">
+        <h2>Recent Redactions</h2>
+        <button id="clearBtn" class="clear-btn" title="Clear log">Clear</button>
+      </div>
+      <div id="redactionLog" class="log-list">
+        <p class="empty-state">No redactions yet</p>
+      </div>
+    </div>
+
+    <footer>
+      <span>Local-only PII detection</span>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

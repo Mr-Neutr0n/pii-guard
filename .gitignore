@@ -1,0 +1,11 @@
+# Python
+presidio/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Go
+proxy/pii-guard-proxy
+
+# OS
+.DS_Store
