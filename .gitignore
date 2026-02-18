@@ -7,5 +7,17 @@ __pycache__/
 # Go
 proxy/pii-guard-proxy
 
+# Node
+node_modules/
+extension-lite/dist/
+
+# Internal docs (not for public repo)
+notes.md
+SESSION_TRACKER.md
+
+# Test artifacts
+.pii-guard-test-profile/
+/tmp/pii-guard-*
+
 # OS
 .DS_Store

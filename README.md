@@ -1,10 +1,8 @@
 # PII Guard
 
-Browser extension + local proxy that intercepts requests to LLM services (ChatGPT, Claude, Gemini) and strips personally identifiable information before your prompt leaves your machine.
+Browser extension that intercepts requests to LLM services (ChatGPT, Claude, Gemini) and strips personally identifiable information before your prompt leaves your machine.
 
-All PII detection runs locally via [Microsoft Presidio](https://github.com/microsoft/presidio) + spaCy NER. No data is sent to any external service for analysis.
-
-## How it works
+All PII detection runs locally. No data is sent to any external service.
 
 ```
 You type: "My name is John Smith, email john@example.com"
@@ -12,113 +10,125 @@ You type: "My name is John Smith, email john@example.com"
 ChatGPT receives: "My name is <PERSON>, email <EMAIL_ADDRESS>"
 ```
 
-```
-Chrome Extension (intercepts fetch)
-       ↓ extracts user text from request body
-Go Proxy (localhost:9400)
-       ↓ forwards to Presidio
-Presidio + spaCy (localhost:9401)
-       ↓ detects PII, returns anonymized text
-Extension replaces request body → LLM gets sanitized input
-```
+## Two versions
+
+| | **Full** | **Lite** |
+|---|---|---|
+| **Setup** | Backend required (Go + Python) | Just install the extension |
+| **Detection** | Presidio + spaCy NER (560MB model) | In-browser regex + Transformers.js NER (65MB model) |
+| **Person names** | High accuracy (spaCy en_core_web_lg) | Good accuracy (DistilBERT quantized) |
+| **Latency** | ~200ms (HTTP roundtrip) | ~100ms (in-process) |
+| **Works offline** | Needs proxy running | Yes |
+| **Best for** | Maximum accuracy, enterprise | Quick setup, personal use |
+
+Both versions use the same interception engine (monkey-patched `fetch`/`XHR`/`WebSocket`) and detect the same entity types.
 
 ## What it detects
 
-| Entity | Method |
-|---|---|
-| Person names | spaCy NER |
-| Email addresses | Regex |
-| Phone numbers | Regex (international + Indian +91) |
-| Credit card numbers | Regex + Luhn |
-| Aadhaar numbers | Regex + Verhoeff checksum |
-| PAN cards | Regex (AAAAA0000A format) |
-| UPI IDs | Regex (xxx@ybl, xxx@paytm, etc.) |
-| IP addresses | Regex |
-| SSN (US) | Regex |
-| Dates of birth | Pattern + context |
+| Entity | Detection | Validation |
+|---|---|---|
+| Person names | NER (spaCy / DistilBERT) | — |
+| Email addresses | Regex | — |
+| Phone numbers | Regex (Indian +91, US, international) | — |
+| Credit card numbers | Regex | Luhn checksum |
+| Aadhaar numbers | Regex | Verhoeff checksum |
+| PAN cards | Regex | Format (AAAAA0000A) |
+| UPI IDs | Regex (30+ bank suffixes) | — |
+| US SSN | Regex | Area/group/serial rules |
+| IP addresses | Regex | Octet range |
+| Locations | NER | — |
 
 ## Supported platforms
 
-- **ChatGPT** (chatgpt.com) — verified working
-- **Claude** (claude.ai) — endpoint configured, needs testing
-- **Gemini** (gemini.google.com) — endpoint configured, needs testing
-- **OpenAI API** (api.openai.com)
-- **Anthropic API** (api.anthropic.com)
-- **Gemini API** (generativelanguage.googleapis.com)
+| Platform | Endpoint | Status |
+|---|---|---|
+| ChatGPT Web | `/backend-api/f/conversation`, autocompletion | Verified |
+| Claude Web | `/api/organizations/.../completion` | Configured |
+| Gemini Web | `BardChatUi`, `StreamGenerate` | Configured |
+| OpenAI API | `/v1/chat/completions` | Configured |
+| Anthropic API | `/v1/messages` | Configured |
+| Gemini API | `generateContent` | Configured |
 
-## Setup
+## Quick start: Lite (no backend)
+
+```bash
+cd extension-lite
+npm install
+npm run build
+```
+
+1. Open `chrome://extensions` → Enable **Developer mode**
+2. Click **Load unpacked** → select `extension-lite/dist/`
+3. Open ChatGPT and type PII — it gets redacted automatically
+
+The NER model (~65MB) downloads on first use and is cached in the browser.
+
+## Quick start: Full (maximum accuracy)
 
 ### Requirements
 
 - macOS (Apple Silicon or Intel)
-- Python 3.10–3.13 (Python 3.14 not yet supported by spaCy)
+- Python 3.10–3.13
 - Go 1.21+
-- Google Chrome or Chromium-based browser
+- Chrome or Chromium-based browser
 
-### 1. Install backend
+### Setup
 
 ```bash
 git clone https://github.com/Mr-Neutr0n/pii-guard.git
 cd pii-guard
-make setup   # creates Python venv, installs Presidio + spaCy model (~560MB download)
+make setup    # creates venv, installs Presidio + spaCy model (~560MB)
+make run      # starts proxy on :9400, auto-launches Presidio on :9401
 ```
 
-### 2. Start the proxy
+Then load the extension:
 
-```bash
-make run     # builds Go binary, starts proxy on :9400, auto-launches Presidio on :9401
-```
+1. Open `chrome://extensions` → Enable **Developer mode**
+2. Click **Load unpacked** → select `extension/`
+3. Wait for the toolbar icon — green badge means proxy is healthy
 
-Wait for `PII Guard proxy listening on 127.0.0.1:9400` — first start takes ~10s for spaCy model loading.
+Test: open ChatGPT and send `"My name is John Smith, email john@example.com"`
 
-### 3. Load the extension
+## Architecture
 
-1. Open `chrome://extensions` (or `arc://extensions`)
-2. Enable **Developer mode**
-3. Click **Load unpacked** → select the `extension/` folder
-4. The PII Guard icon appears in your toolbar
-
-### 4. Test it
-
-Open ChatGPT and send: `"Hello, my name is John Smith and my email is john@example.com"`
-
-ChatGPT should respond to `<PERSON>` and `<EMAIL_ADDRESS>` instead of real values.
-
-## Project structure
+### Full version
 
 ```
-pii-guard/
-├── extension/               Chrome extension (Manifest V3)
-│   ├── manifest.json
-│   ├── src/
-│   │   ├── inject.js        Monkey-patches fetch/XHR/WS (MAIN world)
-│   │   ├── content.js       Bridges page ↔ background (ISOLATED world)
-│   │   └── background.js    Injects page script, manages badge/popup
-│   └── popup/               Extension popup UI
-├── proxy/                   Go proxy (localhost:9400)
-│   ├── main.go              Entry point, CORS, routing
-│   ├── handlers.go          /anonymize, /analyze, /health, /config
-│   ├── presidio.go          Presidio HTTP client
-│   ├── sidecar.go           Auto-launches Presidio process
-│   └── config.go            Entity type toggle
-├── presidio/                Python PII detection engine (localhost:9401)
-│   ├── app.py               FastAPI wrapper around Presidio
-│   ├── setup.sh             Venv + spaCy model setup
-│   └── tests/               pytest suite
-└── Makefile                 setup, build, run, test
+Chrome Extension (MV3)
+  inject.js   — MAIN world, monkey-patches fetch/XHR/WS
+  content.js  — ISOLATED world, bridges page ↔ background
+  background.js — relays to proxy, manages badge
+        ↓ localhost:9400
+Go Proxy
+  Routes requests, CORS, entity config toggles
+        ↓ localhost:9401
+Presidio Engine (Python)
+  FastAPI + spaCy en_core_web_lg, 12+ entity types
 ```
 
-## Architecture decisions
+### Lite version
 
-- **Local-only** — all detection runs on localhost. No data leaves your machine.
-- **Monkey-patching** — the extension patches `window.fetch` in page context to intercept requests before they're sent. Same approach used by commercial tools like Prompt Security.
-- **CSP bypass** — `chrome.scripting.executeScript` with `world: "MAIN"` injects the page script, bypassing Content Security Policy restrictions on sites like ChatGPT.
-- **User text extraction** — only the user's message text is sent to Presidio, not the full JSON body. This avoids false positives on timestamps, UUIDs, and model names.
-- **Fail-open** — if the proxy is down or times out, requests pass through unmodified. Never blocks the user's workflow.
+```
+Chrome Extension (MV3)
+  inject.js     — same interception as Full
+  content.js    — same bridge as Full
+  background.js — routes to offscreen document (no proxy)
+        ↓ chrome.runtime messaging
+Offscreen Document + Web Worker
+  Tier 1: regex + Luhn/Verhoeff checksums (<1ms)
+  Tier 2: Transformers.js DistilBERT NER (~100ms)
+```
 
-## API
+## Design principles
 
-### Proxy (localhost:9400)
+- **Local-only** — all detection on localhost, zero external data transmission
+- **Fail-open** — if detection is unavailable, requests pass through unmodified
+- **Monkey-patching** — patches `window.fetch` in MAIN world to intercept before requests are sent
+- **CSP bypass** — `chrome.scripting.executeScript` with `world: "MAIN"` for sites like ChatGPT
+- **User text extraction** — only user message text goes to detection, not timestamps/UUIDs/metadata
+- **Typing protection** — intercepts ChatGPT's autocompletion endpoint that sends text while typing
+
+## API (Full version only)
 
 ```bash
 # Anonymize text
@@ -138,26 +148,78 @@ curl -X PUT http://localhost:9400/config \
   -d '{"US_SSN": false}'
 ```
 
+## Project structure
+
+```
+pii-guard/
+├── extension/                 Full version — Chrome extension
+│   ├── manifest.json
+│   ├── src/
+│   │   ├── inject.js          Monkey-patches fetch/XHR/WS (MAIN world)
+│   │   ├── content.js         Bridges page ↔ background
+│   │   └── background.js      Relays to Go proxy
+│   └── popup/                 Extension popup UI
+├── proxy/                     Full version — Go proxy (localhost:9400)
+│   ├── main.go                Entry point, CORS, routing
+│   ├── handlers.go            /anonymize, /analyze, /health, /config
+│   ├── presidio.go            Presidio HTTP client
+│   ├── sidecar.go             Auto-launches Presidio process
+│   └── config.go              Entity type toggles
+├── presidio/                  Full version — Python PII engine (localhost:9401)
+│   ├── app.py                 FastAPI + Presidio + spaCy
+│   ├── setup.sh               Venv + model setup
+│   └── tests/                 pytest suite
+├── extension-lite/            Lite version — standalone Chrome extension
+│   ├── manifest.json
+│   ├── package.json           Build deps (Transformers.js, Vite)
+│   ├── vite.config.js         Build config
+│   ├── src/
+│   │   ├── inject.js          Same as Full
+│   │   ├── content.js         Same as Full
+│   │   ├── background.js      Routes to offscreen document
+│   │   ├── offscreen.html     Hosts Web Worker
+│   │   ├── offscreen-worker.js  NER inference + regex detection
+│   │   └── pii/
+│   │       ├── detector.js    Detection orchestrator
+│   │       ├── regex-patterns.js  Regex patterns + context
+│   │       ├── validators.js  Luhn, Verhoeff, PAN, SSN
+│   │       └── anonymizer.js  Entity replacement
+│   └── popup/                 Same popup as Full
+├── e2e/                       E2E test tooling
+│   └── requirements.txt
+├── Makefile                   setup, build, run, test
+└── CLAUDE.md                  Project context
+```
+
 ## Development
 
 ```bash
-make run-presidio   # run Presidio standalone on :9401
-make build          # build Go binary only
-make test           # run all tests (pytest + go test)
+# Full version
+make run-presidio    # run Presidio standalone
+make build           # build Go binary
+make test            # run all tests (pytest + go test)
+
+# Lite version
+cd extension-lite
+npm install
+npm run build        # build to dist/
+npm run watch        # rebuild on changes
+
+# E2E testing
+make setup-e2e       # install Playwright
+make test-e2e        # automated PII test on ChatGPT
+make test-e2e-interactive  # manual browser testing
 ```
 
-After modifying extension files, click the reload icon on `chrome://extensions` and hard-refresh the target page.
+After modifying extension files: reload on `chrome://extensions` and **close + reopen** the LLM tab.
 
-## Roadmap
+## Contributing
 
-- [ ] Smart body parser — proxy-side JSON parsing (send full body like Prompt Security)
-- [ ] Expand to all ChatGPT input endpoints (autocomplete, prepare, file uploads)
-- [ ] Custom validators (Luhn for credit cards, Verhoeff for Aadhaar)
-- [ ] Tune Presidio (remove noisy recognizers that cause false positives)
-- [ ] macOS menu bar app (no terminal needed)
-- [ ] De-anonymization mapping (`<PERSON_1>` ↔ real name, local encrypted storage)
-- [ ] Chrome Web Store listing
-- [ ] Standalone extension with in-browser NER (Transformers.js / compromise.js)
+1. Fork the repo
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `make test`
+5. Submit a PR
 
 ## License
 
