@@ -30,8 +30,9 @@
     { match: "exact", value: "/backend-api/conversation", host: "chatgpt.com" },
     { match: "exact", value: "/backend-anon/f/conversation", host: "chatgpt.com" },
     { match: "exact", value: "/backend-anon/conversation", host: "chatgpt.com" },
-    // ChatGPT Web — autocompletion (sends user text while typing, logged-in only)
+    // ChatGPT Web — typing-phase endpoints (send user text while typing, logged-in only)
     { match: "includes", value: "generate_autocompletion", host: "chatgpt.com" },
+    { match: "includes", value: "f/conversation/prepare", host: "chatgpt.com" },
     // Claude Web
     { match: "regex", value: /\/api\/organizations\/[^/]+\/chat_conversations\/[^/]+\/completion$/, host: "claude.ai" },
     // OpenAI API
@@ -69,6 +70,25 @@
   function extractUserText(bodyStr) {
     try {
       const parsed = JSON.parse(bodyStr);
+
+      // ChatGPT prepare format: partial_query.content.parts[] (typing-phase)
+      if (parsed?.partial_query?.content?.parts && Array.isArray(parsed.partial_query.content.parts)) {
+        const parts = parsed.partial_query.content.parts;
+        const textParts = parts.map((p, idx) => ({ idx, val: p })).filter((p) => typeof p.val === "string");
+        if (textParts.length > 0) {
+          const combinedText = textParts.map((p) => p.val).join("\n");
+          return {
+            text: combinedText,
+            replaceWith: (newText) => {
+              const newParts = newText.split("\n");
+              for (let j = 0; j < textParts.length; j++) {
+                parts[textParts[j].idx] = j < newParts.length ? newParts[j] : "";
+              }
+              return JSON.stringify(parsed);
+            },
+          };
+        }
+      }
 
       // ChatGPT format: messages[].content.parts[] (string elements)
       if (parsed?.messages && Array.isArray(parsed.messages)) {

@@ -263,23 +263,78 @@ Logs auto-upload to backend every 50 entries or 60 seconds.
 
 ---
 
-## Roadmap (post Phase 1 core)
+## What's Done (as of 2026-02-18)
 
-### Phase 2 — Smart Backend + Coverage
+### Phase 1 — Core ✅
+- Go proxy + Presidio sidecar + Chrome extension — working
+- ChatGPT: full endpoint coverage (conversation, anon, autocompletion/typing telemetry)
+- Entity config toggles wired end-to-end (proxy → Presidio entities filter)
+- 12 entity types: PERSON, EMAIL, PHONE, CREDIT_CARD, IN_AADHAAR (Verhoeff), IN_PAN, IN_UPI_ID, IP_ADDRESS, DATE_TIME, US_SSN, IN_PASSPORT, LOCATION
+- Custom validators: Luhn (credit cards), Verhoeff (Aadhaar) — in Presidio and in extension-lite
+- Fallback text extractor for `input_text`, `prompt`, `text`, `prefix`, `content`, `query`
 
-- **Smart body parser** — build a wrapper around Presidio that understands JSON structure. Send full request body (like Prompt Security does), parse platform-specific formats server-side, scan only user text, return modified body. Moves platform knowledge from extension to proxy so the extension stays thin.
-- **Expand endpoint coverage** — add all ChatGPT input endpoints (autocomplete `input_text`, `/f/conversation/prepare` partial queries, file uploads). Mirror Prompt Security's full endpoint list per platform.
-- **Tune Presidio recognizers** — remove noisy/unnecessary detectors (US_DRIVER_LICENSE, IBAN, US_PASSPORT etc. that cause false positives). Keep: PERSON, EMAIL, PHONE, CREDIT_CARD, IN_AADHAAR, IN_PAN, IN_UPI_ID, IP_ADDRESS, US_SSN.
-- **Custom validators** — implement Luhn algorithm for credit cards, Verhoeff checksum for Aadhaar, PAN format validation, instead of relying on Presidio's regex-only matching. Reduces false positives significantly.
+### Extension Lite ✅ (scaffolding)
+- `extension-lite/` — standalone extension with in-browser detection, no backend
+- Tier 1: regex + Luhn/Verhoeff/PAN/SSN validators
+- Tier 2: Transformers.js DistilBERT-NER via offscreen document
+- Vite build pipeline, package.json ready
+- Needs: build testing, real-world validation
 
-### Phase 3 — Native App + De-anonymization
+### E2E Testing ✅
+- `/test-extension` Claude Code skill with Playwright capture script
+- Captures ALL network requests, flags PII leaks, identifies missing endpoints
+- Found and fixed: `/backend-anon/f/conversation` (missing), `generate_autocompletion` (missing), `input_text` field (missing)
+- Supports `--chrome` (Google login), `--no-send` (typing telemetry), `--interactive` modes
 
-- **macOS native app** — package the Go proxy + Presidio into a lightweight menu bar app. Auto-starts on login, shows status icon, no terminal needed. Explore PyInstaller for Presidio binary or embed Python runtime.
-- **De-anonymization mapping** — store `<PERSON_1>` → "Hari Prasad", `<PERSON_2>` → "John Smith" etc. in local encrypted storage. Option to de-anonymize LLM responses client-side (map tokens back to real values). Might be overkill but useful for workflows where you need the real output.
+---
 
-### Phase 4 — Distribution
+## Pending Tasks
 
-- **Binary distribution** — single downloadable package (DMG/pkg for macOS) containing the proxy + Presidio + spaCy model. No Python/Go install needed.
-- **Chrome Web Store** — publish extension for free. Extension connects to locally-installed proxy.
-- **Homebrew formula** — `brew install pii-guard` for the backend.
-- **Windows/Linux ports** — after macOS is stable.
+### Immediate
+- [ ] **Lite: expand platform coverage** — currently only ChatGPT endpoints. Add Claude, Gemini, OpenAI API, Anthropic API endpoints to lite's inject.js (it's a copy of Full, should already have them — verify the build works)
+- [ ] **Test on Gemini** — run `/test-extension` on gemini.google.com, check endpoint coverage, find missing endpoints
+- [ ] **Test on Claude** — run `/test-extension` on claude.ai, check endpoint coverage
+- [ ] **Finalise PII entity types** — decide which to keep, which to remove. Current Presidio defaults include noisy ones (US_DRIVER_LICENSE, IBAN, NRP, MEDICAL_LICENSE, CRYPTO, URL) that cause false positives. Proposed final list:
+  - **Keep:** PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, IN_AADHAAR, IN_PAN, IN_UPI_ID, IP_ADDRESS, US_SSN, LOCATION
+  - **Remove/disable:** DATE_TIME (too many false positives), US_DRIVER_LICENSE, US_PASSPORT, US_ITIN, US_BANK_NUMBER, IBAN_CODE, CRYPTO, NRP, MEDICAL_LICENSE, URL, IN_PASSPORT
+  - Need to test and confirm before removing
+
+### macOS Menu Bar App (Full version)
+- [ ] **Menu bar app** — wrap the Go proxy + Presidio sidecar into a macOS menu bar app (like Raycast, Bartender, etc.). Sits in the top-right menu bar, shows status icon, auto-starts on login. No terminal needed.
+  - Options: SwiftUI menu bar app that launches the Go binary + Presidio as child processes
+  - Or: Go app with [systray](https://github.com/getlantern/systray) or [fyne.io](https://fyne.io) for native menu bar
+  - Or: Wails (Go + web UI) for a lightweight wrapper
+  - Status icon: green (healthy), red (error), gray (disabled)
+  - Menu items: Start/Stop, Open Popup, View Logs, Quit
+  - Launch at login via LaunchAgent plist
+  - Bundle Presidio venv inside the .app or auto-install on first run
+
+### Later
+- [ ] Smart body parser (proxy-side JSON parsing)
+- [ ] Response scanning (SSE streaming)
+- [ ] De-anonymization mapping
+- [ ] Chrome Web Store listing
+- [ ] Homebrew formula
+- [ ] Firefox extension port
+- [ ] Windows/Linux ports
+
+---
+
+## Roadmap (updated)
+
+### Phase 2 — Coverage + Polish (current)
+- Expand endpoint coverage to Claude + Gemini (test and fix)
+- Finalise PII entity list (remove noisy defaults)
+- Build and test extension-lite end-to-end
+- macOS menu bar app for Full version
+
+### Phase 3 — Distribution
+- Chrome Web Store listing (Lite version — zero setup)
+- Homebrew formula for Full version backend
+- DMG/pkg installer for menu bar app + Presidio
+
+### Phase 4 — Advanced
+- De-anonymization mapping
+- Response scanning
+- File upload scanning
+- Enterprise features (allowlists, audit logs)
