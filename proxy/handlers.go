@@ -37,7 +37,7 @@ func (h *ProxyHandler) HandleAnonymize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.presidio.Anonymize(req.Text)
+	result, err := h.presidio.Anonymize(req.Text, h.config.EnabledEntities())
 	if err != nil {
 		log.Printf("Presidio anonymize error: %v", err)
 		http.Error(w, `{"error":"presidio unavailable"}`, http.StatusBadGateway)
@@ -61,7 +61,7 @@ func (h *ProxyHandler) HandleAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entities, err := h.presidio.Analyze(req.Text)
+	entities, err := h.presidio.Analyze(req.Text, h.config.EnabledEntities())
 	if err != nil {
 		log.Printf("Presidio analyze error: %v", err)
 		http.Error(w, `{"error":"presidio unavailable"}`, http.StatusBadGateway)

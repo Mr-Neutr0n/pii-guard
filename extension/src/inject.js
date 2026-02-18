@@ -25,10 +25,13 @@
   // ==========================================================================
 
   const ENDPOINTS = [
-    // ChatGPT Web — the actual message endpoint (note the /f/ path segment)
+    // ChatGPT Web — conversation endpoints (note the /f/ path segment)
     { match: "exact", value: "/backend-api/f/conversation", host: "chatgpt.com" },
     { match: "exact", value: "/backend-api/conversation", host: "chatgpt.com" },
+    { match: "exact", value: "/backend-anon/f/conversation", host: "chatgpt.com" },
     { match: "exact", value: "/backend-anon/conversation", host: "chatgpt.com" },
+    // ChatGPT Web — autocompletion (sends user text while typing, logged-in only)
+    { match: "includes", value: "generate_autocompletion", host: "chatgpt.com" },
     // Claude Web
     { match: "regex", value: /\/api\/organizations\/[^/]+\/chat_conversations\/[^/]+\/completion$/, host: "claude.ai" },
     // OpenAI API
@@ -149,6 +152,20 @@
               for (let j = 0; j < textParts.length; j++) {
                 textParts[j].text = j < newParts.length ? newParts[j] : "";
               }
+              return JSON.stringify(parsed);
+            },
+          };
+        }
+      }
+
+      // Fallback: common text fields (autocompletion, draft, etc.)
+      // ChatGPT autocompletion uses "input_text"
+      for (const field of ["input_text", "prompt", "text", "prefix", "content", "query"]) {
+        if (typeof parsed?.[field] === "string" && parsed[field].length > 0) {
+          return {
+            text: parsed[field],
+            replaceWith: (newText) => {
+              parsed[field] = newText;
               return JSON.stringify(parsed);
             },
           };

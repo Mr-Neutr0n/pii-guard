@@ -17,9 +17,10 @@ type PresidioClient struct {
 }
 
 type PresidioAnalyzeRequest struct {
-	Text           string  `json:"text"`
-	Language       string  `json:"language"`
-	ScoreThreshold float64 `json:"score_threshold"`
+	Text           string   `json:"text"`
+	Language       string   `json:"language"`
+	ScoreThreshold float64  `json:"score_threshold"`
+	Entities       []string `json:"entities,omitempty"`
 }
 
 type Entity struct {
@@ -43,11 +44,12 @@ func NewPresidioClient() *PresidioClient {
 	}
 }
 
-func (p *PresidioClient) Anonymize(text string) (*PresidioAnonymizeResponse, error) {
+func (p *PresidioClient) Anonymize(text string, entities []string) (*PresidioAnonymizeResponse, error) {
 	reqBody := PresidioAnalyzeRequest{
 		Text:           text,
 		Language:       "en",
 		ScoreThreshold: 0.3,
+		Entities:       entities,
 	}
 	data, err := json.Marshal(reqBody)
 	if err != nil {
@@ -72,11 +74,12 @@ func (p *PresidioClient) Anonymize(text string) (*PresidioAnonymizeResponse, err
 	return &result, nil
 }
 
-func (p *PresidioClient) Analyze(text string) ([]Entity, error) {
+func (p *PresidioClient) Analyze(text string, entities []string) ([]Entity, error) {
 	reqBody := PresidioAnalyzeRequest{
 		Text:           text,
 		Language:       "en",
 		ScoreThreshold: 0.3,
+		Entities:       entities,
 	}
 	data, err := json.Marshal(reqBody)
 	if err != nil {

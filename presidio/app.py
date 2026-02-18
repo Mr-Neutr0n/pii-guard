@@ -73,6 +73,7 @@ class AnalyzeRequest(BaseModel):
     text: str
     language: str = "en"
     score_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    entities: Optional[list[str]] = None
 
 
 class EntityResult(BaseModel):
@@ -103,6 +104,7 @@ async def analyze(request: AnalyzeRequest):
     results = analyzer.analyze(
         text=request.text,
         language=request.language,
+        entities=request.entities,
         score_threshold=request.score_threshold,
     )
     entities = [
@@ -124,6 +126,7 @@ async def anonymize(request: AnalyzeRequest):
     analyzer_results = analyzer.analyze(
         text=request.text,
         language=request.language,
+        entities=request.entities,
         score_threshold=request.score_threshold,
     )
 
